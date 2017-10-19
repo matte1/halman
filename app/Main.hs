@@ -1,37 +1,69 @@
 module Main where
 
-import Lib
+-- import Lib
+import Sim
+import Kalman
 import Numeric.LinearAlgebra
 import qualified Graphics.Rendering.Chart.Easy as Plt
 import Graphics.Rendering.Chart.Backend.Diagrams(toFile)
 
-dt = 0.02
-
+dt = 0.01
 a = fromLists
     [[1, 0, dt,  0],
      [0, 1,  0, dt],
      [0, 0,  1,  0],
      [0, 0,  0,  1]] :: Matrix Double
-
-a' = fromLists
-    [[1, 0, dt, 0, 0.5*dt*dt, 0],
-     [0, 1, 0, dt, 0, 0.5*dt*dt],
-     [0, 0, 1, 0, dt, 0],
-     [0, 0, 0, 1, 0, dt],
-     [0, 0, 0, 0, 1, 0],
-     [0, 0, 0, 0, 0, 1]] :: Matrix Double
-
-q = diagl (replicate 4 0.00000000000001)
--- c = diagl (replicate 4 1)
+q' = diagl (replicate 4 0.000000000000001)
 c = fromLists [[1,0,0,0],
                [0,1,0,0]]
+r' = diagl (replicate 2 1)
+g1 = GaussianParams (vector (replicate 2 0)) (sym $ r')
+sys = LinearSystem a c q' r'
+s0  = Estimate (vector [10,10,1,1]) (diagl (replicate 4 10000000))
 
-r = diagl (replicate 2 1)
+newtUpdate :: State -> State
+newtUpdate s = a #> s where
+  a = fromLists
+      [[1, 0, dt,  0],
+       [0, 1,  0, dt],
+       [0, 0,  1,  0],
+       [0, 0,  0,  1]] :: Matrix Double
 
--- Noise generation
-g1 = GaussianParams (vector (replicate 2 0)) (sym $ r)
-sys = System a c q r
-s0  = State (vector [10,10,1,1]) (diagl (replicate 4 1000))
+newtJacobian :: State -> Matrix Double
+newtJacobian s = fromLists
+    [[1, 0, dt,  0],
+     [0, 1,  0, dt],
+     [0, 0,  1,  0],
+     [0, 0,  0,  1]] :: Matrix Double
+
+-- logMeasure :: State -> Measurement
+-- logMeasure s = (\[x,y] -> vector [x,logBase 2 y]) $ toList $ subVector 0 2 s
+--
+-- logJacobian :: State -> Matrix Double
+-- logJacobian x = fromLists [[1,0,0,0],[0,1.0/(0.693*((toList x) !! 1)),0,0]]
+
+
+nonlinear_update = toFile Plt.def "halman.svg" $ do
+  let plant = Plant (a #>) id logMeasure id
+  let sim = take 500 $ simulate plant (vector [10,10,1,1]) 0
+  let measurements = map (\(s, m) -> m) sim
+  let trajectory = map(\(s,m) -> s) sim
+
+  let sys = NonLinearSystem (\x -> a) (a #>) logJacobian logMeasure q' r'
+  let estimate = filter' measurements sys s0
+
+  Plt.plot (Plt.line "Matrix Row" [vector2Chart trajectory])
+  Plt.plot (Plt.line "Matrix Row" [state2Chart estimate])
+  Plt.plot (Plt.points "Matrix Row" (vector2Chart measurements))
+    where
+      logJacobian x = fromLists [[1,0,0,0],[0,1.0/(0.693*((toList x) !! 1)),0,0]]
+      logMeasure s = (\[x,y] -> vector [x,logBase 2 y]) $ toList $ subVector 0 2 s
+      vector2Chart v = map (\[x,y]->(x,y)) $ map toList $ map (subVector 0 2) $ v
+      state2Chart xs = vector2Chart $ map (sX) xs
+
+main = do
+  nonlinear_update
+  print 1
 
 -- main = do
 --   let spaceship = take 5 $ traj (vector [10,10,1,2]) a
@@ -40,40 +72,16 @@ s0  = State (vector [10,10,1,1]) (diagl (replicate 4 1000))
 --   let mavg = moving_average measurements
 --   print estimate
 
-main = toFile Plt.def "halman.svg" $ do
-  let spaceship = take 15000 $ traj (vector [10,10,1,2]) a
-  let measurements = measurement g1 spaceship
-  let estimate = filter' measurements sys s0
-  let mavg = moving_average measurements
-
-  Plt.plot (Plt.line "Matrix Row" [vector2Chart spaceship])
-  Plt.plot (Plt.line "Matrix Row" [state2Chart estimate])
-  Plt.plot (Plt.line "Matrix Row" [vector2Chart mavg])
-  -- Plt.plot (Plt.points "Matrix Row" (vector2Chart measurements))
-    where
-      vector2Chart v = map (\[x,y]->(x,y)) $ map toList $ map (subVector 0 2) $ v
-      state2Chart xs = vector2Chart $ map (sX) xs
-
---
--- x0 = vector [30, 100, 10, -50, 0, -9.8]
-
--- main = do
---   let t = take 10 $ traj x0 a
---   let n = take 10 $ noise' (vector [0,0]) (sym $ diagl [3,3])
---   let m = take 10  $ measurement (vector [0,0]) (sym $ diagl [3,3]) x0 a
---   let avg = moving_average m
---   let avg = map toList $ moving_average m
---   print avg
-
 -- main = toFile Plt.def "halman.svg" $ do
---   let t = take 1000 $ traj x0 a
---   let m = take 1000 $ measurement (vector [0,0]) (sym $ diagl [50,50]) x0 a
---   let traj = toChart $ map (subVector 0 2) $ t
---   let avg = toChart $ moving_average m
---   let m1 = toChart m
+--   let spaceship = take 1500 $ traj (vector [10,10,1,2]) a
+--   let measurements = measurement g1 spaceship
+--   let estimate = filter' measurements sys s0
+--   let mavg = moving_average measurements
 --
---   Plt.plot (Plt.line "Matrix Row" [traj])
---   Plt.plot (Plt.line "Matrix Row" [avg])
---   Plt.plot (Plt.points "Matrix Row" m1)
+--   Plt.plot (Plt.line "Matrix Row" [vector2Chart spaceship])
+--   Plt.plot (Plt.line "Matrix Row" [state2Chart estimate])
+--   Plt.plot (Plt.line "Matrix Row" [vector2Chart mavg])
+--   Plt.plot (Plt.points "Matrix Row" (vector2Chart measurements))
 --     where
---       toChart v = map (\[x,y]->(x,y)) $ map toList $ v
+--       vector2Chart v = map (\[x,y]->(x,y)) $ map toList $ map (subVector 0 2) $ v
+--       state2Chart xs = vector2Chart $ map (sX) xs
