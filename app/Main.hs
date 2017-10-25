@@ -7,81 +7,65 @@ import Numeric.LinearAlgebra
 import qualified Graphics.Rendering.Chart.Easy as Plt
 import Graphics.Rendering.Chart.Backend.Diagrams(toFile)
 
-dt = 0.01
-a = fromLists
-    [[1, 0, dt,  0],
-     [0, 1,  0, dt],
-     [0, 0,  1,  0],
-     [0, 0,  0,  1]] :: Matrix Double
-q' = diagl (replicate 4 0.000000000000001)
-c = fromLists [[1,0,0,0],
-               [0,1,0,0]]
-r' = diagl (replicate 2 1)
-g1 = GaussianParams (vector (replicate 2 0)) (sym $ r')
-sys = LinearSystem a c q' r'
-s0  = Estimate (vector [10,10,1,1]) (diagl (replicate 4 10000000))
+x0 = [10,10,1,10]
+q = diagl (replicate 4 1e-6)
+r = diagl (replicate 2 1)
+s0  = Estimate (vector x0) (diagl (replicate 4 1e6))
 
-newtUpdate :: State -> State
-newtUpdate s = a #> s where
-  a = fromLists
-      [[1, 0, dt,  0],
-       [0, 1,  0, dt],
-       [0, 0,  1,  0],
-       [0, 0,  0,  1]] :: Matrix Double
+stateUpdate :: (Floating a) => [a] -> [a]
+stateUpdate [x,y,xh,yh] = [x + xh*dt, y + yh*dt, xh, yh]
+  where
+    dt = 1
 
-newtJacobian :: State -> Matrix Double
-newtJacobian s = fromLists
-    [[1, 0, dt,  0],
-     [0, 1,  0, dt],
-     [0, 0,  1,  0],
-     [0, 0,  0,  1]] :: Matrix Double
+measurementUpdate :: (Floating a) => [a] -> [a]
+measurementUpdate [x,y,xh,yh] = [x, log y]
 
--- logMeasure :: State -> Measurement
--- logMeasure s = (\[x,y] -> vector [x,logBase 2 y]) $ toList $ subVector 0 2 s
+-- nonlinear = toFile Plt.def "nonlinear.svg" $ do
+--   let plant = Plant stateUpdate id measurementUpdate id
+--   let sim = take 500 $ simulate plant (vector x0) 0
+--   let measurements = map (\(s, m) -> m) sim
+--   let trajectory = map(\(s,m) -> s) sim
 --
--- logJacobian :: State -> Matrix Double
--- logJacobian x = fromLists [[1,0,0,0],[0,1.0/(0.693*((toList x) !! 1)),0,0]]
-
-
-nonlinear_update = toFile Plt.def "halman.svg" $ do
-  let plant = Plant (a #>) id logMeasure id
-  let sim = take 500 $ simulate plant (vector [10,10,1,1]) 0
-  let measurements = map (\(s, m) -> m) sim
-  let trajectory = map(\(s,m) -> s) sim
-
-  let sys = NonLinearSystem (\x -> a) (a #>) logJacobian logMeasure q' r'
-  let estimate = filter' measurements sys s0
-
-  Plt.plot (Plt.line "Matrix Row" [vector2Chart trajectory])
-  Plt.plot (Plt.line "Matrix Row" [state2Chart estimate])
-  Plt.plot (Plt.points "Matrix Row" (vector2Chart measurements))
-    where
-      logJacobian x = fromLists [[1,0,0,0],[0,1.0/(0.693*((toList x) !! 1)),0,0]]
-      logMeasure s = (\[x,y] -> vector [x,logBase 2 y]) $ toList $ subVector 0 2 s
-      vector2Chart v = map (\[x,y]->(x,y)) $ map toList $ map (subVector 0 2) $ v
-      state2Chart xs = vector2Chart $ map (sX) xs
-
-main = do
-  nonlinear_update
-  print 1
-
--- main = do
---   let spaceship = take 5 $ traj (vector [10,10,1,2]) a
---   let measurements = measurement g1 spaceship
---   let estimate = filter' measurements sys s0
---   let mavg = moving_average measurements
---   print estimate
-
--- main = toFile Plt.def "halman.svg" $ do
---   let spaceship = take 1500 $ traj (vector [10,10,1,2]) a
---   let measurements = measurement g1 spaceship
---   let estimate = filter' measurements sys s0
---   let mavg = moving_average measurements
+--   let sys = System stateUpdate measurementUpdate q r
+--   let estimate = scanl (\s z -> ekf sys s z) s0 measurements
 --
---   Plt.plot (Plt.line "Matrix Row" [vector2Chart spaceship])
+--   Plt.plot (Plt.line "Matrix Row" [vector2Chart trajectory])
 --   Plt.plot (Plt.line "Matrix Row" [state2Chart estimate])
---   Plt.plot (Plt.line "Matrix Row" [vector2Chart mavg])
---   Plt.plot (Plt.points "Matrix Row" (vector2Chart measurements))
+--   -- Plt.plot (Plt.points "Matrix Row" (  vector2Chart measurements))
 --     where
 --       vector2Chart v = map (\[x,y]->(x,y)) $ map toList $ map (subVector 0 2) $ v
 --       state2Chart xs = vector2Chart $ map (sX) xs
+
+-- main = do
+--   let plant = Plant stateUpdate id measurementUpdate id
+--   let sim = take 50 $ simulate plant (vector x0) 0
+--   let measurements = map (\(s, m) -> m) sim
+--   let trajectory = map(\(s,m) -> s) sim
+--   let sys = System stateUpdate measurementUpdate q r
+--   let estimate = scanl (\s z -> ekf sys s z) s0 measurements
+--
+--   nonlinear
+--   print 1
+main = do
+  let sys = System stateUpdate measurementUpdate q r
+  let estimate = Estimate (vector [0, 0, 1, 1]) (diagl [1,2,1,1])
+  print $ ut sys estimate
+
+-- plotSigmas = toFile Plt.def "sigmas.svg" $ do
+--   let plant = Plant stateUpdate id measurementUpdate id
+--   let sim = take 500 $ simulate plant (vector x0) 0
+--   let measurements = map (\(s, m) -> m) sim
+--   let trajectory = map(\(s,m) -> s) sim
+--
+--   let sys = System stateUpdate measurementUpdate q r
+--   let estimate = scanl (\s z -> ekf sys s z) s0 measurements
+--
+--   let sigmas = genSigmas (last estimate) 2.0
+--
+--   Plt.plot (Plt.points "Matrix Row" (list2Chart sigmas))
+--     where
+--       list2Chart v = map (\[x,y,xh,yh]->(x,y)) v
+--
+-- main = do
+--   plotSigmas
+--   print 1
