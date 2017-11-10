@@ -5,11 +5,11 @@ module Kalman
     , System(..)
     , Estimate(..)
     , Measurement(..)
-    -- , GaussianParams(..)
     , genSigmas
     , ekf
     , ut
     , ukf
+    , weightedCrossCov
     ) where
 
 import Numeric.LinearAlgebra
@@ -17,6 +17,9 @@ import System.Random
 import Sim
 import Numeric.AD
 import Numeric.AD.Internal.Reverse
+import Control.Applicative
+
+type Sigmas = [[Double]]
 
 data System = System {fA, fH :: (forall a. Floating a => ([a] -> [a])),
                       kC, kD :: Matrix Double}
@@ -57,54 +60,99 @@ ekf (System fA fH kQ kR) (Estimate x p) z = Estimate x' p'
 -- TODO: Pretty ugly method for converting back and forth between
 -- matrices/vectors/list. A lot of this could be cleaner with more 'matlab'
 -- esque functions.
--- TODO: Maybe return [Vector] instead of [[Double]]
--- TODO: Need to multiple p by the weight c
-genSigmas :: Estimate -> Double -> [[Double]]
+genSigmas :: Estimate -> Double -> Sigmas
 genSigmas (Estimate x p) c = sigmas
   where
-    cP = scale c $ chol $ sym p         -- Cholesky Factorization to get sqrt of matrix
-    pos = toLists $ (fromLists $ replicate (size x) (toList x)) + cP
-    neg = toLists $ (fromLists $ replicate (size x) (toList x)) - cP
+    -- Cholesky Factorization to get sqrt of matrix
+    cP = scale (sqrt c) $ chol $ sym p
+    -- Add/sub the sqrt covariance matrix from the current estimate of x
+    xs = fromLists $ replicate (size x) (toList x)
+    pos = toLists $ xs + cP
+    neg = toLists $ xs - cP
+    -- Combine all sigma points including the original estimate of x at the head
     sigmas = [(toList x)] ++ pos ++ neg
 
 
 -- Unscented Transformation
--- 1. Generate new sigma points based on current covariance/mean
--- 2. Run those points through the nonlinear update function
--- 3. Calculate the new statistics of the state and measurement
-ut :: System -> Estimate -> Estimate
-ut (System fA fH _ _) (Estimate x p) = Estimate x' p'
+ut :: [Vector Double] -> [Double] -> [Double] -> Estimate
+ut xs wm wc = Estimate x' p'
   where
-    n = fromIntegral $ size x
-    alpha = 1e-3
-    beta = 2.0
-    lambda = (alpha**2 * n) - n
-    wmo = lambda / (n + lambda)
-    wco = wmo + (1.0 - alpha**2 + beta)
-    wi = 1.0 / (2.0 * (n + lambda))
+    -- Weight each sigma by scaling factor
+    xw = getZipList $ (scale) <$> ZipList wm <*> ZipList xs
+    x' = foldl1 (\v1 v2 -> v1 + v2) xw
 
-    sigmas = genSigmas (Estimate x p) (sqrt $ n+lambda)
-
-    fX = map (fromList) $ map fA sigmas
-    x' = foldl (\v1 v2 -> v1 + (scale wi v2)) (scale wmo $ head fX) (tail fX)
-
-    fP = map (cov x') fX
-    p' = foldl (\m1 m2 -> m1 + (scale wi m2)) (scale wco $ head fP) (tail fP)
-
-    cov :: Vector Double -> Vector Double -> Matrix Double
-    cov v1 v2 = m
-      where
-        dV = [v2 - v1]
-        m = fromColumns dV <> fromRows dV
+    -- Compute predicted (forecasted) state variable statistics
+    v1 = map (\v -> fromColumns [v]) $ map (-x'+) xs
+    v2 = map (\v -> fromRows [v])    $ map (-x'+) xs
+    cov = getZipList $ (<>) <$> ZipList v1 <*> ZipList v2
+    covw = getZipList $ (scale) <$> ZipList wc <*> ZipList cov
+    p' = foldl1 (\m1 m2 -> m1 + m2) covw
 
 
+-- Compute weighted covariance given two vectors
+-- weightedCov :: Vector Double -> [Vector Double] -> Double -> Double -> Matrix Double
+-- weightedCov v vs w1 w2 = cP where
+--   cPo = scale w1 $ cov v (head vs)
+--   cPi = map (scale w2) $ map (cov v) (tail vs)
+--   cP  = foldl (\m1 m2 -> m1 + m2) cPo cPi
+--
+--   cov :: Vector Double -> Vector Double -> Matrix Double
+--   cov v1 v2 = fromColumns ([v2 - v1]) <> fromRows ([v2 - v1])
+
+
+weightedCrossCov :: Vector Double -> [Vector Double] -> Vector Double -> [Vector Double] -> [Double] -> Matrix Double
+weightedCrossCov v1 vs1 v2 vs2 wc = cP where
+  vs1' = map (\v -> fromColumns [v]) $ map (-v1+) vs1
+  vs2' = map (\v -> fromRows [v])    $ map (-v2+) vs2
+  cov  = getZipList $ (<>) <$> ZipList vs1' <*> ZipList vs2'
+  covw = getZipList $ (scale) <$> ZipList wc <*> ZipList cov
+  cP   = foldl1 (\m1 m2 -> m1 + m2) covw
+
+
+-- ukf :: System -> Estimate -> Measurement -> (Double, Double)
+-- ukf (System fA fH kQ kR) (Estimate x p) z = (wmo, wi)
+-- ukf :: System -> Estimate -> Measurement -> Sigmas
+-- ukf (System fA fH kQ kR) (Estimate x p) z = sigmas
+-- ukf :: System -> Estimate -> Measurement -> [Vector Double]
+-- ukf (System fA fH kQ kR) (Estimate x p) z = xs
 -- ukf :: System -> Estimate -> Measurement -> Estimate
-ukf :: System -> Estimate -> Estimate
-ukf sys@(System fA fH kQ kR) est@(Estimate x p) = e'
+-- ukf (System fA fH kQ kR) (Estimate x p) z = (Estimate z' cZ)
+-- ukf :: System -> Estimate -> Measurement -> Estimate
+-- ukf (System fA fH kQ kR) (Estimate x p) z = (Estimate x' cX)
+ukf :: System -> Estimate -> Measurement -> Estimate
+ukf (System fA fH kQ kR) (Estimate x p) z = (Estimate xh ph)
   where
-    e' = ut sys est
+    -- Params
+    -- n = fromIntegral $ size x
+    -- wo = 0
+    -- wi = (1-wo)/(2.0 * n)
 
+    l = fromIntegral $ size x
+    m = fromIntegral $ size z
+    alpha = 1e-3
+    ki = 0
+    beta = 2
 
--- filter' :: [Measurement] -> System -> Estimate -> [Estimate]
--- filter' zs sys s0 = scanl (\s z -> ekf sys s z) s0 zs
--- x' = foldl (\v1 v2 -> v1 + (scale wi v2)) (scale wmo $ (vector $ fA $ toList x)) fX
+    lambda = alpha^2 * (l + ki) - l
+    c = l + lambda
+
+    wm = (lambda / c) : (replicate (2*(fromIntegral $ size x)) (0.5/c))
+    wc = ((lambda / c) + (1-alpha^2+beta)) : (replicate (2*(fromIntegral $ size x)) (0.5/c))
+
+    -- Generate sigma points around current estimate
+    sigmas = genSigmas (Estimate x p) c
+
+    -- Run sigmas through non linear function to produce new points
+    xs = map (fromList) (map (fA) sigmas)
+    zs = map (fromList) (map (fH) sigmas)
+
+    Estimate x' cX = ut xs wm wc
+    Estimate z' cZ = ut zs wm wc
+
+    -- Calculate the weighted cross covariance of transformed forecast and
+    -- measurements
+    cXZ = weightedCrossCov x' xs z' zs wc
+
+    kK = cXZ <> inv (cZ + kR)
+    xh = x' + kK #> (z - z')
+    ph = (cX + kQ) - kK <> (cZ + kR) <> tr kK

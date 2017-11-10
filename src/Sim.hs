@@ -15,8 +15,9 @@ type State = Vector Double
 data Plant = Plant {fA, fC, fB, fD :: (forall a. Floating a => ([a] -> [a]))}
 
 simulate :: Plant -> State -> Int -> [(State, Measurement)]
-simulate (Plant fA fB fC fD) x n = (x', y') : simulate (Plant fA fB fC fD) x' (n+1)
+simulate (Plant fA fB fC fD) x n = (x', y') : simulate (Plant fA fB fC fD) xh (n+1)
   where
     x' = vector $ fA (toList x)
     y  = vector $ fC (toList x')
-    y' = y + randomVector n Gaussian (size y)
+    xh = x' + (scale 0.0 $ randomVector (n+1000) Gaussian (size x))
+    y' = y + (scale 0.0 $ randomVector n Gaussian (size y))
