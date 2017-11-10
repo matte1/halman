@@ -10,7 +10,7 @@ import Control.Applicative
 
 vanderPol = toFile Plt.def "VanderPol.svg" $ do
   let x0 = [1.4, 0]
-  let q = diagl (replicate 2 0.025)
+  let q = diagl (replicate 2 0.001)
   let r = diagl (replicate 2 0.5)
   let s0  = Estimate (vector [0, 5]) (diagl (replicate 2 5))
 
@@ -24,14 +24,14 @@ vanderPol = toFile Plt.def "VanderPol.svg" $ do
   let ukfs = scanl (\s z -> ukf sys s z) s0 measurements
 
   let t1 = linspace 500 (0,50::Double)
-  let pts = oneList (toList t1) (map (\[x] -> x) $ map toList $ map (subVector 1 1) trajectory)
-  let pts2 = oneList (toList t1) (map (\[x] -> x) $ map toList $ map (subVector 1 1) $ map (sX) ukfs)
-  let pts3 = oneList (toList t1) (map (\[x] -> x) $ map toList $ map (subVector 1 1) $ map (sX) ekfs)
-  let pts4 = oneList (toList t1) (map (\[x] -> x) $ map toList $ map (subVector 0 0) measurements)
+  let pts  = oneList (toList t1) (map (\[x] -> x) $ map toList $ map (subVector 0 1) trajectory)
+  let pts2 = oneList (toList t1) (map (\[x] -> x) $ map toList $ map (subVector 0 1) $ map (sX) ukfs)
+  let pts3 = oneList (toList t1) (map (\[x] -> x) $ map toList $ map (subVector 0 1) $ map (sX) ekfs)
+  let pts4 = oneList (toList t1) (map (\[x] -> x) $ map toList $ map (subVector 0 1) measurements)
 
-  -- Plt.plot (Plt.line "Plant" [pts])
-  -- Plt.plot (Plt.line "UKF" [pts2])
-  -- Plt.plot (Plt.line "EKF" [pts3])
+  Plt.plot (Plt.line "Plant" [pts])
+  Plt.plot (Plt.line "UKF" [pts2])
+  Plt.plot (Plt.line "EKF" [pts3])
   Plt.plot (Plt.line "Measurements" [pts4])
 
 fA2 :: (Floating a) => [a] -> [a]

@@ -22,7 +22,7 @@ import Control.Applicative
 type Sigmas = [[Double]]
 
 data System = System {fA, fH :: (forall a. Floating a => ([a] -> [a])),
-                      kC, kD :: Matrix Double}
+                      kQ, kR :: Matrix Double}
 
 data Estimate = Estimate {sX :: Vector Double,
                           sP :: Matrix Double} deriving (Show)
@@ -34,13 +34,16 @@ moving_average x = scanl1 (\v1 v2 -> (0.9*v1) + (0.1*v2)) x
 
 -- kalman :: System -> Estimate -> Measurement -> Estimate
 -- kalman (System a c q r) (Estimate x p) z = Estimate x' p' where
+--   -- Convert lists to matrices since we have linear system
+--   lA = fromLists a
+--   lC = fromLists c
 --   -- prediction step
---   px = a #> x
---   pp = a <> p <> tr a + q
+--   px = lA #> x
+--   pp = lA <> p <> tr lA + q
 --   -- update step
---   g = pp <> tr c <> inv (c <> pp <> tr c + r)
---   x' = px + g #> (z - c #> px)
---   p' = (ident (size x) - g <> c) <> pp
+--   g = pp <> tr lC <> inv (lC <> pp <> tr lC + r)
+--   x' = px + g #> (z - lC #> px)
+--   p' = (ident (size x) - g <> lC) <> pp
 
 
 ekf :: System -> Estimate -> Measurement -> Estimate
@@ -57,9 +60,6 @@ ekf (System fA fH kQ kR) (Estimate x p) z = Estimate x' p'
     p' = (ident (size x) - g <> h) <> pp
 
 
--- TODO: Pretty ugly method for converting back and forth between
--- matrices/vectors/list. A lot of this could be cleaner with more 'matlab'
--- esque functions.
 genSigmas :: Estimate -> Double -> Sigmas
 genSigmas (Estimate x p) c = sigmas
   where
@@ -89,17 +89,6 @@ ut xs wm wc = Estimate x' p'
     p' = foldl1 (\m1 m2 -> m1 + m2) covw
 
 
--- Compute weighted covariance given two vectors
--- weightedCov :: Vector Double -> [Vector Double] -> Double -> Double -> Matrix Double
--- weightedCov v vs w1 w2 = cP where
---   cPo = scale w1 $ cov v (head vs)
---   cPi = map (scale w2) $ map (cov v) (tail vs)
---   cP  = foldl (\m1 m2 -> m1 + m2) cPo cPi
---
---   cov :: Vector Double -> Vector Double -> Matrix Double
---   cov v1 v2 = fromColumns ([v2 - v1]) <> fromRows ([v2 - v1])
-
-
 weightedCrossCov :: Vector Double -> [Vector Double] -> Vector Double -> [Vector Double] -> [Double] -> Matrix Double
 weightedCrossCov v1 vs1 v2 vs2 wc = cP where
   vs1' = map (\v -> fromColumns [v]) $ map (-v1+) vs1
@@ -109,24 +98,9 @@ weightedCrossCov v1 vs1 v2 vs2 wc = cP where
   cP   = foldl1 (\m1 m2 -> m1 + m2) covw
 
 
--- ukf :: System -> Estimate -> Measurement -> (Double, Double)
--- ukf (System fA fH kQ kR) (Estimate x p) z = (wmo, wi)
--- ukf :: System -> Estimate -> Measurement -> Sigmas
--- ukf (System fA fH kQ kR) (Estimate x p) z = sigmas
--- ukf :: System -> Estimate -> Measurement -> [Vector Double]
--- ukf (System fA fH kQ kR) (Estimate x p) z = xs
--- ukf :: System -> Estimate -> Measurement -> Estimate
--- ukf (System fA fH kQ kR) (Estimate x p) z = (Estimate z' cZ)
--- ukf :: System -> Estimate -> Measurement -> Estimate
--- ukf (System fA fH kQ kR) (Estimate x p) z = (Estimate x' cX)
 ukf :: System -> Estimate -> Measurement -> Estimate
 ukf (System fA fH kQ kR) (Estimate x p) z = (Estimate xh ph)
   where
-    -- Params
-    -- n = fromIntegral $ size x
-    -- wo = 0
-    -- wi = (1-wo)/(2.0 * n)
-
     l = fromIntegral $ size x
     m = fromIntegral $ size z
     alpha = 1e-3

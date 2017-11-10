@@ -19,5 +19,5 @@ simulate (Plant fA fB fC fD) x n = (x', y') : simulate (Plant fA fB fC fD) xh (n
   where
     x' = vector $ fA (toList x)
     y  = vector $ fC (toList x')
-    xh = x' + (scale 0.0 $ randomVector (n+1000) Gaussian (size x))
-    y' = y + (scale 0.0 $ randomVector n Gaussian (size y))
+    xh = x' + (scale 0.01 $ randomVector (n+1000) Gaussian (size x))
+    y' = y + (scale 1.0 $ randomVector n Gaussian (size y))
