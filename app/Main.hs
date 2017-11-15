@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE PackageImports #-}
 
 module Main where
 
@@ -28,5 +27,4 @@ chart = toRenderable layout
            $ layout_plots .~ [toPlot circleP]
            $ def
 
-main = do
-   renderableToWindow chart 200 200
+main = renderableToWindow chart 200 200
