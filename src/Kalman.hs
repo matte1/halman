@@ -83,8 +83,7 @@ ut xs wm wc = Estimate x' p'
     -- Weight each sigma by scaling factor
     xw = getZipList $ scale <$> ZipList wm <*> ZipList xs
     x' = sum xw
-
-    -- Compute predicted (forecasted) state variable statistics
+    -- Compute forecasted state statistics
     v1 = map (\v -> fromColumns [v-x']) xs
     v2 = map (\v -> fromRows    [v-x']) xs
     cov = getZipList  $ (<>)  <$> ZipList v1 <*> ZipList v2
@@ -121,14 +120,12 @@ ukf (System fA fH kQ kR) (Estimate x p) z = Estimate xh ph
 
     -- Run sigmas through non linear function to produce new points
     xs = map (fromList . fA) sigmas
-    -- xs = map fromList (map (fromList . fA) sigmas)
     zs = map (fromList . fH) sigmas
 
     Estimate x' cX = ut xs wm wc
     Estimate z' cZ = ut zs wm wc
 
-    -- Calculate the weighted cross covariance of transformed forecast and
-    -- measurements
+    -- Calculate the weighted cross covariance
     cXZ = weightedCrossCov x' xs z' zs wc
 
     kK = cXZ <> inv (cZ + kR)
