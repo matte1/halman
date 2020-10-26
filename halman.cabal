@@ -13,94 +13,105 @@ build-type:          Simple
 extra-source-files:  README.md
 cabal-version:       >=1.10
 
-library
-  hs-source-dirs:      src/Estimation
-  exposed-modules:     Sim, Kalman
-  build-depends:       base >= 4.7 && < 5
-                     , hmatrix
-                     , random
-                     , ad
-  default-language:    Haskell2010
-
-executable DumpCopter
-  hs-source-dirs:      src/Models
-  main-is:             DumpCopter.hs
-  ghc-options:         -threaded
-                       -Wall
-                       -rtsopts
-                       -with-rtsopts=-N
-  build-depends:       base
-                     , halman
-                     , hmatrix
-                     , hmatrix-gsl
-                     , Chart
-                     , Chart-diagrams
-                     , Chart-cairo
-  default-language:    Haskell2010
-
 executable halman
   hs-source-dirs:      app
   main-is:             Main.hs
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   build-depends:       base
-                     , halman
                      , hmatrix
-                     , Chart
-                     , Chart-diagrams
-                     , Chart-cairo
-                     , Chart-gtk
-                     , cairo
-                     , glib
-                     , colour
-                     , data-default-class
-                     , lens
-                     , random
                      , ad
+                     , bytestring
+                     , network
   default-language:    Haskell2010
 
-flag examples
-    description:    build the examples
-    default:        True
+-- TODO(matte): Split this into multiple libraries.
+library
+  hs-source-dirs:      src/
 
-executable CannonBall
-  if flag(examples)
-    Buildable: True
-  else
-    Buildable: False
-  hs-source-dirs:      examples
-  main-is:             CannonBall.hs
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
-  default-language:    Haskell2010
+  exposed-modules:     Math.Frames
+                     , Math.Spatial
+                     , Math.Vectorize
+                     , Models.Aircraft
+                     , Physics.RigidBody
+                     , Sim.Sim
+
   build-depends:       base
-                       , halman
-                       , hmatrix
-                       , Chart
-                       , Chart-diagrams
+                     , linear
+                     , hmatrix
+                     , hmatrix-gsl
+                     , distributive
 
-executable VanderPol
-  if flag(examples)
-    Buildable: True
-  else
-    Buildable: False
-  hs-source-dirs:      examples
-  main-is:             VanderPol.hs
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
-  default-language:    Haskell2010
-  build-depends:       base
-                       , halman
-                       , hmatrix
-                       , Chart
-                       , Chart-diagrams
-
-test-suite halman-test
-  type:                exitcode-stdio-1.0
-  hs-source-dirs:      test
-  main-is:             Spec.hs
-  build-depends:       base
-                     , halman
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
 
-source-repository head
-  type:     git
-  location: https://github.com/githubuser/halman
+
+-- flag examples
+--     description:    build the examples
+--     default:        True
+--
+-- executable CannonBall
+--   if flag(examples)
+--     Buildable: True
+--   else
+--     Buildable: False
+--   hs-source-dirs:      examples
+--   main-is:             CannonBall.hs
+--   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+--   default-language:    Haskell2010
+--   build-depends:       base
+--                        , halman
+--                        , hmatrix
+--                        , Chart
+--                        , Chart-diagrams
+--
+-- executable VanderPol
+--   if flag(examples)
+--     Buildable: True
+--   else
+--     Buildable: False
+--   hs-source-dirs:      examples
+--   main-is:             VanderPol.hs
+--   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+--   default-language:    Haskell2010
+--   build-depends:       base
+--                        , halman
+--                        , hmatrix
+--                        , Chart
+--                        , Chart-diagrams
+--
+-- test-suite halman-test
+--   type:                exitcode-stdio-1.0
+--   hs-source-dirs:      test
+--   main-is:             Spec.hs
+--   build-depends:       base
+--                      , halman
+--   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+--   default-language:    Haskell2010
+--
+-- source-repository head
+--   type:     git
+--   location: https://github.com/githubuser/halman
+--
+-- executable DumbCopter
+--   hs-source-dirs:      src/Models
+--   main-is:             DumbCopter.hs
+--   ghc-options:         -threaded
+--                        -Wall
+--                        -rtsopts
+--                        -with-rtsopts=-N
+--   build-depends:       base
+--                      , halman
+--                      , hmatrix
+--                      , hmatrix-gsl
+--                      , Chart
+--                      , Chart-diagrams
+--                      , Chart-cairo
+--   default-language:    Haskell2010
+--
+-- library
+--   hs-source-dirs:      src/Estimation
+--   exposed-modules:     Sim, Kalman
+--   build-depends:       base >= 4.7 && < 5
+--                      , hmatrix
+--                      , random
+--                      , ad
+--   default-language:    Haskell2010

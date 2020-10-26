@@ -1,6 +1,3 @@
-{-# LANGUAGE ExtendedDefaultRules #-}
-
-
 module Main where
 
 import qualified Graphics.Rendering.Chart.Easy as Plt
@@ -9,7 +6,7 @@ import Numeric.LinearAlgebra
 import Numeric.GSL.ODE
 
 dynamics :: Double -> [Double] -> [Double]
-dynamics _ [x0, x1, w] =
+dynamics _ [_, x1, w] =
     [ x1
     , -mass*g + k*w + cd*x1**2
     , (torque - c * w) / j
@@ -30,10 +27,16 @@ dynamics _ [x0, x1, w] =
     -- Coefficient of friction motor
     c = 0.1
     -- Calculate a physics based torque
-    torque' = mass * g * j / (k * dt) - x1 / dt**2 - w * j / dt + c * w
-    torque = max 0 (min 10 torque')
+    torque =
+      clamp (-10, 10) $
+        mass * g * j / (k * dt)
+        - x1 / dt**2
+        - w * j / dt
+        + c * w
+    -- Clamp between lower bound and upper bound
+    clamp (lb, ub) x = max lb (min ub x)
 
-
+dumbCopter :: IO ()
 dumbCopter = toFile Plt.def "DumpCopter.svg" $ do
   let totalTime = 5
       dt = 0.01
@@ -45,4 +48,5 @@ dumbCopter = toFile Plt.def "DumpCopter.svg" $ do
   Plt.plot (Plt.line "vel" [zip ts' (toList vel)])
   Plt.plot (Plt.line "omega" [zip ts' (toList omega)])
 
+main :: IO ()
 main = dumbCopter
