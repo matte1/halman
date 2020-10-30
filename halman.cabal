@@ -10,7 +10,7 @@ maintainer:          example@example.com
 copyright:           2017 Author name here
 category:            Web
 build-type:          Simple
-extra-source-files:  README.md
+-- extra-source-files:  README.md
 cabal-version:       >=1.10
 
 executable halman
@@ -22,6 +22,7 @@ executable halman
                      , ad
                      , bytestring
                      , network
+                     , halman
   default-language:    Haskell2010
 
 -- TODO(matte): Split this into multiple libraries.
