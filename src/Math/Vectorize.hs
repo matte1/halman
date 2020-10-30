@@ -1,8 +1,9 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 module Math.Vectorize
-  ( Vectorize (..)
-  ) where
+  ( Vectorize (..),
+  )
+where
 
 class Vectorize g a where
   vectorize :: g a -> [a]

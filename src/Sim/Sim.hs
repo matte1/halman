@@ -1,16 +1,16 @@
 module Sim.Sim
-  ( stepOde
-  ) where
+  ( stepOde,
+  )
+where
 
-import Linear hiding ( cross )
+import Linear hiding (cross)
 import Math.Frames
 import Math.Spatial
-import Math.Vectorize ( Vectorize(..) )
+import Math.Vectorize (Vectorize (..))
 import Models.Aircraft
-import Numeric.GSL.ODE ( odeSolve )
-import Numeric.LinearAlgebra ( Vector(..), toList, fromList, toRows )
+import Numeric.GSL.ODE (odeSolve)
+import Numeric.LinearAlgebra (Vector (..), fromList, toList, toRows)
 import Physics.RigidBody
-
 
 runOde ::
   V3T Body Double ->
@@ -31,14 +31,14 @@ stepOde forces moments state = devectorize $ toList solution
     (_ : solution : _) =
       toRows $
         odeSolve
-        wrapOde
-        (vectorize state)
-        (fromList [0.0, 0.01])
+          wrapOde
+          (vectorize state)
+          (fromList [0.0, 0.01])
 
     wrapOde :: Double -> [Double] -> [Double]
     wrapOde t0 x0 =
       vectorize $
         runOde
-        forces
-        moments
-        (devectorize x0)
+          forces
+          moments
+          (devectorize x0)

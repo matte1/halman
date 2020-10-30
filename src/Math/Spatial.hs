@@ -1,6 +1,7 @@
-{-# LANGUAGE DeriveFunctor, GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module Math.Spatial
   ( Dcm (..),
@@ -12,21 +13,22 @@ module Math.Spatial
     dcmOfEuler321,
     transposeDcm,
     rot,
-  ) where
+  )
+where
 
-import Math.Frames ( Body, Vehicle, Vehicle1, Vehicle2 )
-import Math.Vectorize ( Vectorize(..) )
-import qualified Linear as L
-import Linear ( Additive(..), V3(..), M33, (!*), (!*!) )
 import Data.Distributive (Distributive (..))
+import Linear (Additive (..), M33, V3 (..), (!*), (!*!))
+import qualified Linear as L
+import Math.Frames (Body, Vehicle, Vehicle1, Vehicle2)
+import Math.Vectorize (Vectorize (..))
 
 instance Vectorize V3 a where
   vectorize (V3 a b c) = [a, b, c]
-  devectorize (a : b : c : []) = V3 a b c
+  devectorize [a, b, c] = V3 a b c
   devectorize _ = error "devectorize: Wrong number of elements"
 
 -- | V3 with a phantom type representing frame.
-newtype V3T frame a = V3T { unV3T :: V3 a }
+newtype V3T frame a = V3T {unV3T :: V3 a}
   deriving (Show, Functor, Foldable, Fractional, Num, Applicative, Additive)
 
 instance Vectorize (V3T frame) a where
@@ -42,15 +44,15 @@ instance Distributive (V3T f) where
         (fmap (\(V3T (V3 _ _ z)) -> z) f)
 
 data Euler frame1 frame2 a = Euler
-  { eulerRoll :: a
-  , eulerPitch :: a
-  , eulerYaw :: a
+  { eulerRoll :: a,
+    eulerPitch :: a,
+    eulerYaw :: a
   }
   deriving (Show, Functor)
 
 instance Vectorize (Euler frame1 frame2) a where
   vectorize (Euler roll pitch yaw) = [roll, pitch, yaw]
-  devectorize ([roll, pitch, yaw]) = Euler roll pitch yaw
+  devectorize [roll, pitch, yaw] = Euler roll pitch yaw
 
 newtype Dcm f1 f2 a = DcmUnitVectors
   { getUnitVectors :: V3T f2 (V3T f1 a)

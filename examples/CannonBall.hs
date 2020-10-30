@@ -1,19 +1,21 @@
 module Main where
 
-import Sim
+import Control.Applicative
+import Graphics.Rendering.Chart.Backend.Diagrams (toFile)
+import qualified Graphics.Rendering.Chart.Easy as Plt
 import Kalman
 import Numeric.LinearAlgebra
-import qualified Graphics.Rendering.Chart.Easy as Plt
-import Graphics.Rendering.Chart.Backend.Diagrams(toFile)
-import Control.Applicative
+import Sim
 
 fA1 :: (Floating a) => [a] -> [a]
-fA1 [x,y,xh,yh,ax,ay] = [x + xh*dt + c*ax*dt*dt,
-                         y + yh*dt + c*ay*dt*dt,
-                         xh + ax*dt,
-                         yh + ay*dt,
-                         ax,
-                         ay]
+fA1 [x, y, xh, yh, ax, ay] =
+  [ x + xh * dt + c * ax * dt * dt,
+    y + yh * dt + c * ay * dt * dt,
+    xh + ax * dt,
+    yh + ay * dt,
+    ax,
+    ay
+  ]
   where
     dt = 0.1
     c = 0.5
@@ -26,7 +28,7 @@ cannonBall = toFile Plt.def "CannonBall.svg" $ do
   let x0 = [0, 0, 10, 10, 0, -9.8]
   let q = diagl [0.1, 0.1, 1e-3, 1e-3, 1e-3, 1e-3]
   let r = diagl (replicate 2 0.5)
-  let s0  = Estimate (vector x0) (diagl (replicate 6 5))
+  let s0 = Estimate (vector x0) (diagl (replicate 6 5))
 
   -- Fire the cannon ball
   let plant = Plant fA1 id fH1 id
@@ -40,7 +42,7 @@ cannonBall = toFile Plt.def "CannonBall.svg" $ do
   let ukfs = scanl (ukf sys) s0 measurements
 
   -- Plot the results
-  let vector2Chart = map ((\[x,y]->(x,y)) . toList . subVector 0 2)
+  let vector2Chart = map ((\[x, y] -> (x, y)) . toList . subVector 0 2)
   let state2Chart xs = vector2Chart $ map sX xs
 
   Plt.plot (Plt.line "Plant" [vector2Chart trajectory])

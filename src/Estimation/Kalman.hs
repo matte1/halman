@@ -1,37 +1,42 @@
 {-# LANGUAGE RankNTypes #-}
 
 module Kalman
-    (movingAverage
-    , System(..)
-    , Estimate(..)
-    , Measurement(..)
-    , genSigmas
-    , ekf
-    , ut
-    , ukf
-    , weightedCrossCov
-    , runKF
-    ) where
+  ( movingAverage,
+    System (..),
+    Estimate (..),
+    Measurement (..),
+    genSigmas,
+    ekf,
+    ut,
+    ukf,
+    weightedCrossCov,
+    runKF,
+  )
+where
 
-import Numeric.LinearAlgebra
-import System.Random
-import Sim
+import Control.Applicative
 import Numeric.AD
 import Numeric.AD.Internal.Reverse
-import Control.Applicative
+import Numeric.LinearAlgebra
+import Sim
+import System.Random
 
 type Sigmas = [[Double]]
 
-data System = System {fA, fH :: forall a. Floating a => ([a] -> [a]),
-                      kQ, kR :: Matrix Double}
+data System = System
+  { fA, fH :: forall a. Floating a => ([a] -> [a]),
+    kQ, kR :: Matrix Double
+  }
 
-data Estimate = Estimate {sX :: Vector Double,
-                          sP :: Matrix Double} deriving (Show)
+data Estimate = Estimate
+  { sX :: Vector Double,
+    sP :: Matrix Double
+  }
+  deriving (Show)
 
 -- Simple 2 tap FIR to appx moving average filter
 movingAverage :: [Vector Double] -> [Vector Double]
-movingAverage = scanl1 (\v1 v2 -> (0.9*v1) + (0.1*v2))
-
+movingAverage = scanl1 (\v1 v2 -> (0.9 * v1) + (0.1 * v2))
 
 -- kalman :: System -> Estimate -> Measurement -> Estimate
 -- kalman (System a c q r) (Estimate x p) z = Estimate x' p' where
@@ -57,11 +62,10 @@ ekf (System fA fH kQ kR) (Estimate x p) z = Estimate x' p'
     px = fA $ toList x
     pp = a <> p <> tr a + kQ
     -- update step
-    h  = fromLists $ jacobian fH px
-    k  = pp <> tr h <> inv (h <> pp <> tr h + kR)
+    h = fromLists $ jacobian fH px
+    k = pp <> tr h <> inv (h <> pp <> tr h + kR)
     x' = vector px + k #> (z - vector (take (size z) $ fH px))
     p' = (ident (size x) - k <> h) <> pp
-
 
 genSigmas :: Estimate -> Double -> Sigmas
 genSigmas (Estimate x p) c = sigmas
@@ -75,7 +79,6 @@ genSigmas (Estimate x p) c = sigmas
     -- Combine all sigma points including the original estimate of x at the head
     sigmas = [toList x] ++ pos ++ neg
 
-
 -- Unscented Transformation
 ut :: [Vector Double] -> [Double] -> [Double] -> Estimate
 ut xs wm wc = Estimate x' p'
@@ -84,21 +87,20 @@ ut xs wm wc = Estimate x' p'
     xw = getZipList $ scale <$> ZipList wm <*> ZipList xs
     x' = sum xw
     -- Compute forecasted state statistics
-    v1 = map (\v -> fromColumns [v-x']) xs
-    v2 = map (\v -> fromRows    [v-x']) xs
-    cov = getZipList  $ (<>)  <$> ZipList v1 <*> ZipList v2
+    v1 = map (\v -> fromColumns [v - x']) xs
+    v2 = map (\v -> fromRows [v - x']) xs
+    cov = getZipList $ (<>) <$> ZipList v1 <*> ZipList v2
     covw = getZipList $ scale <$> ZipList wc <*> ZipList cov
     p' = sum covw
 
-
 weightedCrossCov :: Vector Double -> [Vector Double] -> Vector Double -> [Vector Double] -> [Double] -> Matrix Double
-weightedCrossCov v1 vs1 v2 vs2 wc = cP where
-  vs1' = map (\v -> fromColumns [v-v1]) vs1
-  vs2' = map (\v -> fromRows    [v-v2]) vs2
-  cov  = getZipList $ (<>) <$> ZipList vs1' <*> ZipList vs2'
-  covw = getZipList $ scale <$> ZipList wc <*> ZipList cov
-  cP   = sum covw
-
+weightedCrossCov v1 vs1 v2 vs2 wc = cP
+  where
+    vs1' = map (\v -> fromColumns [v - v1]) vs1
+    vs2' = map (\v -> fromRows [v - v2]) vs2
+    cov = getZipList $ (<>) <$> ZipList vs1' <*> ZipList vs2'
+    covw = getZipList $ scale <$> ZipList wc <*> ZipList cov
+    cP = sum covw
 
 ukf :: System -> Estimate -> Measurement -> Estimate
 ukf (System fA fH kQ kR) (Estimate x p) z = Estimate xh ph
@@ -109,11 +111,11 @@ ukf (System fA fH kQ kR) (Estimate x p) z = Estimate xh ph
     ki = 0
     beta = 2
 
-    lambda = alpha^2 * (l + ki) - l
+    lambda = alpha ^ 2 * (l + ki) - l
     c = l + lambda
 
-    wm = (lambda / c) : replicate (2 * fromIntegral (size x)) (0.5/c)
-    wc = ((lambda / c) + (1-alpha^2+beta)) : replicate (2 * fromIntegral (size x)) (0.5/c)
+    wm = (lambda / c) : replicate (2 * fromIntegral (size x)) (0.5 / c)
+    wc = ((lambda / c) + (1 - alpha ^ 2 + beta)) : replicate (2 * fromIntegral (size x)) (0.5 / c)
 
     -- Generate sigma points around current estimate
     sigmas = genSigmas (Estimate x p) c

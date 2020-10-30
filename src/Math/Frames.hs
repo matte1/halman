@@ -4,7 +4,8 @@ module Math.Frames
     Vehicle1,
     Vehicle2,
     Body,
-  ) where
+  )
+where
 
 -- | Inertial frame.
 --

@@ -1,19 +1,20 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module Models.Aircraft
-  ( AircraftState (..)
-  ) where
+  ( AircraftState (..),
+  )
+where
 
-import Math.Vectorize ( Vectorize(..) )
 import Math.Frames
 import Math.Spatial
-import Physics.RigidBody ( RigidBodyState )
+import Math.Vectorize (Vectorize (..))
+import Physics.RigidBody (RigidBodyState)
 
-data AircraftState a =
-  AircraftState
+newtype AircraftState a = AircraftState
   { dsRigidBody :: RigidBodyState a
-  } deriving Show
+  }
+  deriving (Show)
 
 instance Vectorize AircraftState a where
   vectorize = vectorize . dsRigidBody
