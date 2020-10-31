@@ -44,7 +44,7 @@ gravity = 9.81
 
 -- TODO(matte): Move these into an aircraft constants struct
 mass :: Double
-mass = 10
+mass = 100
 
 inertia :: V3T Body (V3T Body Double)
 inertia =
@@ -88,6 +88,20 @@ invertInertia
       cofactor (q, r, s, t) = det22 (V2 (V2 q r) (V2 s t))
       det = det33 (V3 (V3 a b c) (V3 d e f) (V3 g h i))
 
+-- Modeled as a mass spring damper system
+groundContactModel :: V3T Ned Double -> V3T Ned Double -> V3T Ned Double
+groundContactModel (V3T (V3 _ _ z')) (V3T (V3 _ _ vz) )= V3T (V3 0 0 fz)
+  where
+    fz =
+      if z' > 0
+        then mass * gravity - springConstant * z  - dampeningCoefficient * vz
+        else mass * gravity
+    -- Subtract the maxPenitration so that the mass spring damper system evens out at 0
+    z = z' - negate maxPenitration
+    maxPenitration = 0.1
+    springConstant = mass * gravity / maxPenitration
+    dampeningCoefficient = 1000
+
 -- TODO(matte): Make the correct invertable and composable rotation transformations
 -- so you don't have to do this by hand.
 stepRigidBodyOde ::
@@ -96,10 +110,11 @@ stepRigidBodyOde ::
   RigidBodyState Double ->
   RigidBodyState Double
 stepRigidBodyOde
-  forces
+  forces'
   moments
   RigidBodyState
-    { ds_v_bn_b = v_bn_b,
+    { ds_r_n2b_n = r_n2b_n,
+      ds_v_bn_b = v_bn_b,
       ds_w_bn_b = w_bn_b,
       dsEulerN2B = eulerN2B
     } =
@@ -114,14 +129,16 @@ stepRigidBodyOde
       dcmN2B = dcmOfEuler321 eulerN2B
       dcmB2N :: Dcm Body Ned Double
       dcmB2N = transposeDcm dcmN2B
-
       -- Update position
       r_n2b_n' :: V3T Ned Double
       r_n2b_n' = rot dcmB2N v_bn_b
       -- Update velocities w/ forces
       v_bn_b' :: V3T Body Double
       v_bn_b' = w_bn_b `cross` v_bn_b + forces ^/ mass
-
+        where
+          forces = forces' ^+^ rot dcmN2B gravityWithGround
+          -- TODO(matte): Add a more complicated ground model.
+          gravityWithGround = groundContactModel r_n2b_n (rot dcmB2N v_bn_b)
       -- Update euler angles
       dsEulerN2B' :: Euler Ned Body Double
       dsEulerN2B' = Euler x y z
@@ -139,7 +156,6 @@ stepRigidBodyOde
                 (V3T (V3 1 (sr * tp) (cr * tp)))
                 (V3T (V3 0 cr (- sr)))
                 (V3T (V3 0 (sr / cp) (cr / cp)))
-
       -- Update body angular rates w/ moments
       w_bn_b' :: V3T Body Double
       w_bn_b' = inertiaInv !* (moments ^-^ w_bn_b `cross` (inertia !* w_bn_b))

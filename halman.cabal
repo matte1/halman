@@ -1,7 +1,5 @@
 name:                halman
 version:             0.1.0.0
--- synopsis:
--- description:
 homepage:            https://github.com/githubuser/halman#readme
 license:             BSD3
 license-file:        LICENSE
@@ -10,7 +8,6 @@ maintainer:          example@example.com
 copyright:           2017 Author name here
 category:            Web
 build-type:          Simple
--- extra-source-files:  README.md
 cabal-version:       >=1.10
 
 executable halman
@@ -25,7 +22,6 @@ executable halman
                      , halman
   default-language:    Haskell2010
 
--- TODO(matte): Split this into multiple libraries.
 library
   hs-source-dirs:      src/
 

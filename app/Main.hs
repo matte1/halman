@@ -48,7 +48,7 @@ main = do
       f :: Int32 -> AircraftState Double -> IO ()
       f 0 _ = closeSocket sock
       f n state = do
-        let state' = stepOde (V3T (V3 10 0 (-10))) (V3T (V3 0 0 0)) state
+        let state' = stepOde (V3T (V3 0 0 0)) (V3T (V3 0 0 0)) state
         publish sock (iters - n) state'
         threadDelay (1000 * 10)
         f (n - 1) state'
@@ -57,7 +57,7 @@ main = do
     AircraftState
       { dsRigidBody =
           RigidBodyState
-            { ds_r_n2b_n = V3T $ V3 0 0 0,
+            { ds_r_n2b_n = V3T $ V3 0 0 (-10),
               ds_v_bn_b = V3T $ V3 0 0 0,
               dsEulerN2B = Euler 0 0 0,
               ds_w_bn_b = V3T (V3 0 0 0)
