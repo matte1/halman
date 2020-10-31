@@ -41,6 +41,22 @@ newSocket = do
 closeSocket :: NS.Socket -> IO ()
 closeSocket = NS.close
 
+constants :: RigidBodyConstants 
+constants =
+  RigidBodyConstants
+  { cInertia =
+      let ix = 1
+          iy = 1
+          iz = 1
+          ixz = 0.0
+       in V3T $
+            V3
+              (V3T (V3 ix 0 (- ixz)))
+              (V3T (V3 0 iy 0))
+              (V3T (V3 (- ixz) 0 iz))
+  , cMass = 100
+  }
+
 main :: IO ()
 main = do
   sock <- newSocket
@@ -48,7 +64,7 @@ main = do
       f :: Int32 -> AircraftState Double -> IO ()
       f 0 _ = closeSocket sock
       f n state = do
-        let state' = stepOde (V3T (V3 0 0 0)) (V3T (V3 0 0 0)) state
+        let state' = stepOde constants (V3T (V3 0 0 0)) (V3T (V3 0 0 0)) state
         publish sock (iters - n) state'
         threadDelay (1000 * 10)
         f (n - 1) state'
